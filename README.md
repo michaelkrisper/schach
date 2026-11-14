@@ -2,8 +2,8 @@
 
 Photograph a chess board, get the position recognised, and see the best moves.
 
-[![CI](https://github.com/michaelkrisper/schachfoto/actions/workflows/ci.yml/badge.svg)](https://github.com/michaelkrisper/schachfoto/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/github/v/tag/michaelkrisper/schachfoto?sort=semver&label=version)](https://github.com/michaelkrisper/schachfoto/releases)
+[![CI](https://github.com/michaelkrisper/schach/actions/workflows/ci.yml/badge.svg)](https://github.com/michaelkrisper/schach/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/github/v/tag/michaelkrisper/schach?sort=semver&label=version)](https://github.com/michaelkrisper/schach/releases)
 [![Node 26](https://img.shields.io/badge/node-26-339933)](.nvmrc)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Live demo](https://img.shields.io/badge/demo-schachfoto.pages.dev-2ea44f)](https://schachfoto.pages.dev)
