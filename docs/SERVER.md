@@ -26,12 +26,18 @@ other method 405. The request body may be up to 7 MB (the function
 accepts images up to 5 MB, sent as base64 inside JSON; the app scales photos to
 1568 px first, usually well below 1 MB).
 
+The access code and the limits are checked before the body is read. Per client
+(`CF-Connecting-IP`, which Caddy sets; IPv6 by /64): ten wrong access codes lock it
+out for an hour (429), and it gets 60 recognitions per hour (429). Four
+recognitions run at once, further ones answer 503. The counters live in memory, so
+a restart clears them. A model call is cut off after 75 s, all of them after 140 s.
+
 ## Secrets
 
 | Name | Purpose | Missing |
 |---|---|---|
 | `GEMINI_API_KEY` | Google Gemini API key (free tier) | recognition answers 503 with a message, the rest of the app works |
-| `ACCESS_CODE` | code the app asks for before it uploads a photo | recognition is open to everyone who knows the address |
+| `ACCESS_CODE` | code the app asks for before it uploads a photo | recognition answers 503 (the unit sets `NODE_ENV=production`; without that it would be open to everyone) |
 
 Set both in `/etc/krisperapps/schach.env`, then `systemctl restart schach`.
 `DB_PATH` and `DATA_DIR` from the service unit are not used.
