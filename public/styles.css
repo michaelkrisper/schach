@@ -83,7 +83,14 @@ main {
 }
 
 #view-start {
+  position: relative;
   justify-content: center;
+}
+
+#version {
+  position: absolute;
+  inset: auto 0 0;
+  text-align: center;
 }
 
 .view[hidden],

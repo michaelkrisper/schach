@@ -16,6 +16,7 @@ import {
   squareIndex,
   squareName,
 } from './position.js';
+import { VERSION } from './version.js';
 import { Chess } from '../vendor/chess.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -627,6 +628,7 @@ function init() {
     render();
   });
 
+  $('#version').textContent = `Version ${VERSION}`;
   $('#btn-last').hidden = !restore();
   $('#btn-last').addEventListener('click', () => {
     state.marked = [];
