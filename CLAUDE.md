@@ -46,6 +46,8 @@ node scripts/browser-check.mjs [url] [shot.png]   # headless Chrome smoke test, 
 - `server/node.js`: node:http entry, loopback only. Route table (`POST /api/recognize`),
   7 MB body limit, `env` = `process.env`, polyfill for `crypto.subtle.timingSafeEqual`.
   Static files never reach it: Caddy serves `public/` (`scripts/dev.mjs` locally).
+  Exception: `/` is a directory for Caddy and passed on, so the entry answers it
+  with `public/index.html`.
 - Cache headers for static files are set in Caddy, listed in `docs/SERVER.md`
   (`/vendor/*` one day, everything else `no-cache`); `scripts/dev.mjs` mirrors them.
 

@@ -1,9 +1,12 @@
 // Entry point on the own server: plain Node in front of the one function in
 // functions/. Only requests for files that do not exist in public/ arrive here;
 // the web server in front (Caddy; scripts/dev.mjs locally) serves public/ itself.
+// The one exception is "/": Caddy passes directories on, so the start page is
+// answered here.
 //
 //   PORT=8805 node server/node.js
 import { timingSafeEqual } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { onRequestPost as recognize } from '../functions/api/recognize.js';
 
@@ -14,7 +17,15 @@ crypto.subtle.timingSafeEqual ??= (a, b) => timingSafeEqual(a, b);
 // The app itself sends far less (1568 px JPEG, usually below 1 MB).
 const MAX_BODY = 7 * 1024 * 1024;
 
-const ROUTES = { '/api/recognize': { POST: recognize } };
+const INDEX = new URL('../public/index.html', import.meta.url);
+
+function startPage() {
+  return new Response(readFileSync(INDEX), {
+    headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' },
+  });
+}
+
+const ROUTES = { '/': { GET: startPage, HEAD: startPage }, '/api/recognize': { POST: recognize } };
 
 function json(body, status, headers = {}) {
   return Response.json(body, { status, headers: { 'cache-control': 'no-store', ...headers } });
