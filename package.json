@@ -2,7 +2,7 @@
   "name": "schachfoto",
   "version": "1.0.0",
   "private": true,
-  "description": "Photograph a chess board, recognise the position and see the best moves. PWA on Cloudflare Pages.",
+  "description": "Photograph a chess board, recognise the position and see the best moves. PWA with a small Node backend.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -10,16 +10,15 @@
   },
   "type": "module",
   "scripts": {
-    "dev": "wrangler pages dev public --port 8793",
-    "deploy": "rm -rf dist && cp -r public dist && node scripts/stamp-sw.mjs dist && wrangler pages deploy dist --project-name schachfoto --branch main",
+    "dev": "node --env-file-if-exists=.env scripts/dev.mjs",
     "lint": "biome check",
     "lint:fix": "biome check --write",
     "test": "node --test 'tests/*.test.js'",
-    "check": "npm run lint && npm test"
+    "check": "npm run lint && npm test",
+    "start": "node server/node.js"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.6.7",
-    "wrangler": "^4.160.1"
+    "@biomejs/biome": "^2.6.7"
   },
   "engines": {
     "node": ">=26"
