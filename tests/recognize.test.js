@@ -154,3 +154,43 @@ test('reports an answer that is not JSON', async () => {
   const res = await onRequestPost({ request: request(), env });
   assert.equal(res.status, 502);
 });
+
+test('in production a missing access code closes the endpoint instead of opening it', async () => {
+  const res = await onRequestPost({
+    request: request(),
+    env: { GEMINI_API_KEY: 'key', NODE_ENV: 'production' },
+  });
+  assert.equal(res.status, 503);
+  assert.match((await res.json()).error, /Zugangscode/);
+  // Local development without a code stays open.
+  globalThis.fetch = async () => geminiAnswer(START);
+  assert.equal((await onRequestPost({ request: request(), env: { GEMINI_API_KEY: 'key' } })).status, 200);
+});
+
+function timedOut() {
+  throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+}
+
+test('every model call has a timeout, and a model that runs into it is skipped', async () => {
+  const signals = [];
+  globalThis.fetch = async (_url, init) => {
+    signals.push(init.signal);
+    return signals.length === 1 ? timedOut() : geminiAnswer(START);
+  };
+  const res = await onRequestPost({ request: request(), env });
+  assert.equal(res.status, 200);
+  assert.equal(signals.length, 2);
+  for (const signal of signals) assert.ok(signal instanceof AbortSignal);
+});
+
+test('reports when every model ran into the timeout', async () => {
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return timedOut();
+  };
+  const res = await onRequestPost({ request: request(), env });
+  assert.equal(res.status, 504);
+  assert.match((await res.json()).error, /zu lange/);
+  assert.equal(calls, 3);
+});

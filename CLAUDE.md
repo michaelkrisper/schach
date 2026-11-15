@@ -45,6 +45,8 @@ node scripts/browser-check.mjs [url] [shot.png]   # headless Chrome smoke test, 
   as a Pages Function (`onRequestPost({ request, env })`) and kept that way.
 - `server/node.js`: node:http entry, loopback only. Route table (`POST /api/recognize`),
   7 MB body limit, `env` = `process.env`, polyfill for `crypto.subtle.timingSafeEqual`.
+  Checks the access code and the limits (per client: 10 wrong codes, 60 recognitions
+  an hour; 4 recognitions at once) before it reads the body; counters live in memory.
   Static files never reach it: Caddy serves `public/` (`scripts/dev.mjs` locally).
   Exception: `/` is a directory for Caddy and passed on, so the entry answers it
   with `public/index.html`.
@@ -82,7 +84,8 @@ node scripts/browser-check.mjs [url] [shot.png]   # headless Chrome smoke test, 
 - Secrets `GEMINI_API_KEY` and `ACCESS_CODE` live only on the server, in
   `/etc/krisperapps/schach.env`; Michi sets them himself (then `systemctl restart
   schach`). Never print or commit them. Without them the service still starts:
-  recognition answers 503, and without `ACCESS_CODE` it is open to everyone.
+  recognition answers 503 (without `ACCESS_CODE` only under `NODE_ENV=production`;
+  in local development it is then open).
 - Stockfish stays the lite single-threaded build: multi-threaded WASM needs
   cross-origin isolation (COOP/COEP), and the app must run on iOS without it.
 - Recognition has only been tested with rendered board diagrams; real phone photos

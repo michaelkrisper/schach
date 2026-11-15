@@ -41,6 +41,10 @@ const SCHEMA = {
 const MODELS = ['gemini-3.6-flash', 'gemini-3-flash-preview', 'gemini-3.8-flash'];
 const API = 'https://generativelanguage.googleapis.com/v1beta/models';
 const RETRY_NEXT = new Set([429, 500, 503, 524]);
+// A model that hangs must not hold the request forever: each call is cut off, and
+// all of them together stay below 150 s (3 Flash Preview needed up to 73 s).
+const CALL_TIMEOUT_MS = 75_000;
+const TOTAL_TIMEOUT_MS = 140_000;
 
 function json(body, status = 200) {
   return Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
@@ -54,10 +58,48 @@ async function sameSecret(a, b) {
   return crypto.subtle.timingSafeEqual(ha, hb);
 }
 
-export async function onRequestPost({ request, env }) {
-  if (env.ACCESS_CODE && !(await sameSecret(request.headers.get('x-access-code') ?? '', env.ACCESS_CODE))) {
-    return json({ error: 'code' }, 401);
+/**
+ * The refusal for a request with this access code, or null when it may pass.
+ * Needs no body, so a server can ask before it reads one.
+ */
+export async function refuseAccess(code, env) {
+  if (!env.ACCESS_CODE) {
+    // Fail closed: a production server that lost its code must not serve everyone.
+    if (env.NODE_ENV !== 'production') return null;
+    return json({ error: 'Der Zugangscode ist auf dem Server nicht eingerichtet.' }, 503);
   }
+  return (await sameSecret(code ?? '', env.ACCESS_CODE)) ? null : json({ error: 'code' }, 401);
+}
+
+/** The first usable answer of the models, or null when they all ran out of time. */
+async function askGemini(payload, apiKey) {
+  const deadline = Date.now() + TOTAL_TIMEOUT_MS;
+  let res = null;
+  for (const model of MODELS) {
+    const left = deadline - Date.now();
+    if (left <= 0) break;
+    try {
+      res = await fetch(`${API}/${model}:generateContent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+        body: payload,
+        signal: AbortSignal.timeout(Math.min(CALL_TIMEOUT_MS, left)),
+      });
+    } catch (err) {
+      if (err.name !== 'TimeoutError') throw err;
+      res = null;
+      console.error('gemini', model, 'timeout');
+      continue;
+    }
+    if (!RETRY_NEXT.has(res.status)) break;
+    console.error('gemini', model, res.status);
+  }
+  return res;
+}
+
+export async function onRequestPost({ request, env }) {
+  const refusal = await refuseAccess(request.headers.get('x-access-code'), env);
+  if (refusal) return refusal;
   if (!env.GEMINI_API_KEY) {
     return json({ error: 'Bilderkennung ist auf dem Server noch nicht eingerichtet.' }, 503);
   }
@@ -79,16 +121,8 @@ export async function onRequestPost({ request, env }) {
       thinkingConfig: { thinkingLevel: 'high' },
     },
   });
-  let res;
-  for (const model of MODELS) {
-    res = await fetch(`${API}/${model}:generateContent`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-      body: payload,
-    });
-    if (!RETRY_NEXT.has(res.status)) break;
-    console.error('gemini', model, res.status);
-  }
+  const res = await askGemini(payload, env.GEMINI_API_KEY);
+  if (!res) return json({ error: 'Die Erkennung hat zu lange gedauert, bitte nochmal versuchen.' }, 504);
   if (res.status === 429) {
     return json(
       { error: 'Gratis-Kontingent gerade aufgebraucht, bitte in einer Minute nochmal versuchen.' },
@@ -102,10 +136,11 @@ export async function onRequestPost({ request, env }) {
     console.error('gemini', res.status, await res.text());
     return json({ error: `Erkennung fehlgeschlagen (${res.status}).` }, 502);
   }
-  const data = await res.json();
-  const candidate = data.candidates?.[0];
+  // The timeout also covers the body; an answer cut off there counts as aborted.
+  const data = await res.json().catch(() => null);
+  const candidate = data?.candidates?.[0];
   if (candidate?.finishReason !== 'STOP') {
-    console.error('gemini finish', candidate?.finishReason, data.promptFeedback);
+    console.error('gemini finish', candidate?.finishReason, data?.promptFeedback);
     return json({ error: 'Erkennung abgebrochen, bitte nochmal versuchen.' }, 502);
   }
   const text = candidate.content.parts
