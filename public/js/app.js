@@ -628,7 +628,7 @@ function init() {
     render();
   });
 
-  $('#version').textContent = `Version ${VERSION}`;
+  $('#version').textContent = VERSION === 'dev' ? VERSION : `v${VERSION}`;
   $('#btn-last').hidden = !restore();
   $('#btn-last').addEventListener('click', () => {
     state.marked = [];
