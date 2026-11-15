@@ -6,11 +6,11 @@ Photograph a chess board, get the position recognised, and see the best moves.
 [![Version](https://img.shields.io/github/v/tag/michaelkrisper/schach?sort=semver&label=version)](https://github.com/michaelkrisper/schach/releases)
 [![Node 26](https://img.shields.io/badge/node-26-339933)](.nvmrc)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Live demo](https://img.shields.io/badge/demo-schachfoto.pages.dev-2ea44f)](https://schachfoto.pages.dev)
+[![Live demo](https://img.shields.io/badge/demo-schach.krisperapps.de-2ea44f)](https://schach.krisperapps.de)
 
-**Live: https://schachfoto.pages.dev**
+**Live: https://schach.krisperapps.de**
 
-A progressive web app for Android and iPhone, hosted on Cloudflare Pages. The
+A progressive web app for Android and iPhone with a small Node backend. The
 user interface is in German.
 
 <img src="docs/screenshot.png" alt="Analysis view with three suggested moves and arrows on the board" width="320">
@@ -31,7 +31,7 @@ user interface is in German.
 ## How it works
 
 1. **Photo:** the phone scales the image down to at most 1568 px on the long edge and posts it to the
-   Pages Function `functions/api/recognize.js`.
+   function `functions/api/recognize.js`.
 2. **Recognition:** the function asks Google Gemini (free tier) for the
    position as eight rank strings using structured output. Models are tried in
    order (3.6 Flash, 3 Flash Preview, 3.8 Flash); on 429/500/503/524 the next
@@ -51,14 +51,15 @@ free quota is not used by others. Without `GEMINI_API_KEY` recognition answers
 | `public/` | Static PWA, vanilla ES modules, no build step |
 | `public/js/position.js` | Board model, FEN, plausibility checks, orientation |
 | `public/js/engine.js` | UCI wrapper around the Stockfish worker |
-| `functions/api/recognize.js` | Pages Function: access code, Gemini call, validation |
+| `functions/api/recognize.js` | Recognition: access code, Gemini call, validation |
+| `server/node.js` | HTTP entry on plain Node that runs the function |
 | `tests/` | `node:test` unit tests for board logic, UCI wrapper and the function (mocked `fetch` and worker) |
 | `scripts/browser-check.mjs` | Headless Chrome smoke test of the full UI flow |
 
 ## Privacy
 
 Move analysis runs entirely on the device. Recognition uploads the photo to
-Google Gemini via the Pages Function; on the free tier Google may use uploaded
+Google Gemini via the function; on the free tier Google may use uploaded
 images to improve its models. Nothing is stored by the app's server.
 
 ## Development
@@ -67,7 +68,7 @@ Requires Node 26 (see `.nvmrc`).
 
 ```sh
 npm install
-cp .dev.vars.example .dev.vars    # fill in GEMINI_API_KEY and ACCESS_CODE
+cp .env.example .env              # fill in GEMINI_API_KEY and ACCESS_CODE (optional)
 npm run dev                       # http://localhost:8793
 npm run check                     # Biome lint/format + unit tests
 npm test                          # unit tests only
@@ -75,7 +76,7 @@ npm run lint:fix                  # apply Biome fixes
 node scripts/browser-check.mjs    # smoke test against the dev server (needs google-chrome)
 ```
 
-`node scripts/browser-check.mjs https://schachfoto.pages.dev` runs the smoke
+`node scripts/browser-check.mjs https://schach.krisperapps.de` runs the smoke
 test against the deployed site; `VIEWPORT=375x667` simulates a small phone.
 
 The service worker's cache names carry a content hash of their files, stamped
@@ -86,21 +87,18 @@ download the engine again.
 ## Deployment
 
 Every push to `main` runs the `CI` workflow (lint and tests). If that passes,
-the `deploy` job publishes `public/` to Cloudflare Pages, provided the
-repository secret `CLOUDFLARE_API_TOKEN` and variable `CLOUDFLARE_ACCOUNT_ID`
-are set. Manual deploy: `npm run deploy` (stamps a copy in `dist/`).
+the `server` job uploads `public/`, `functions/` and `server/` to the own
+server (repository secret `DEPLOY_SSH_KEY`) and checks the live site. There,
+Caddy serves `public/` and a Node service (`node server/node.js`, no
+dependencies) answers `/api/recognize`.
 
 Every merge to `main` is tagged with the next patch version, and only tagged
 commits are deployed; bundled releases with release notes come from the
 Release workflow (see [CONTRIBUTING](CONTRIBUTING.md#versions-and-releases)).
 
-The function's secrets are set from an interactive terminal (a pipe without a
-TTY stores an empty value):
-
-```sh
-npx wrangler pages secret put GEMINI_API_KEY --project-name schachfoto
-npx wrangler pages secret put ACCESS_CODE --project-name schachfoto
-```
+The function's secrets `GEMINI_API_KEY` and `ACCESS_CODE` are environment
+variables of the service. Server layout, secrets and the cache headers Caddy
+sets for static files: [docs/SERVER.md](docs/SERVER.md).
 
 ## Contributing
 

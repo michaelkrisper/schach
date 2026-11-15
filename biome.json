@@ -6,7 +6,9 @@
       "public/js/**/*.js",
       "public/sw.js",
       "scripts/stamp-sw.mjs",
+      "scripts/dev.mjs",
       "functions/**/*.js",
+      "server/**/*.js",
       "tests/**/*.js",
       "*.json"
     ]

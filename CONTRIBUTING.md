@@ -28,7 +28,7 @@ Requires Node 26 (see `.nvmrc`).
 
 ```sh
 npm ci
-cp .dev.vars.example .dev.vars    # fill in GEMINI_API_KEY and ACCESS_CODE
+cp .env.example .env              # fill in GEMINI_API_KEY and ACCESS_CODE (optional)
 npm run dev                       # http://localhost:8793
 npm run check                     # Biome lint/format + unit tests, as in CI
 ```

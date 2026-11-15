@@ -1,7 +1,7 @@
 name: CI
 
-# Lint and tests on every push and PR. Pushes to main also go live on
-# Cloudflare Pages, as long as the CLOUDFLARE_API_TOKEN secret is set.
+# Lint and tests on every push and PR. Pushes to main also go live on the own
+# server (https://schach.krisperapps.de/).
 
 on:
   push:
@@ -26,41 +26,61 @@ jobs:
       - run: npm ci
       - run: npm run check
 
-  deploy:
-    # Only commits that got a version tag: a re-run of an older run deploys nothing.
+  # The own server (https://schach.krisperapps.de/): Caddy serves public/, Node the API.
+  # Only commits that got a version tag: a re-run of an older run deploys nothing.
+  # The key may only write into the app's folder there; the server restarts the
+  # app once .version changes.
+  server:
+    name: krisperapps.de
     needs: [check, version]
     if: needs.version.outputs.version != ''
     runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-server
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: npm
-      # The wrangler action then uses the version pinned in package-lock.json.
-      - run: npm ci
       # The service worker's cache names get a content hash of their files.
       - run: node scripts/stamp-sw.mjs public
-
-      # Without a token the deploy is skipped cleanly instead of failing.
-      - id: guard
+      - name: Upload
         env:
-          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
-          if [ -z "$TOKEN" ]; then
-            echo "::warning::CLOUDFLARE_API_TOKEN is not set - deploy skipped."
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "ok=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Deploy to Cloudflare Pages
-        if: steps.guard.outputs.ok == 'true'
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy public --project-name schachfoto --branch main
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          echo 'krisperapps.de ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMchrlhQI1OFJ2cEfQosiydiSPg498c/+Mggebk+zVLO' > ~/.ssh/known_hosts
+          mkdir _app
+          cp -r public functions server package.json _app/
+          rsync -rtz --delete --exclude=/.version -e 'ssh -i ~/.ssh/deploy' _app/ deploy@krisperapps.de:./
+          # Last, and written in place: this is what the server watches.
+          echo "$VERSION" > .version
+          rsync -tz --inplace -e 'ssh -i ~/.ssh/deploy' .version deploy@krisperapps.de:./
+      - name: Verify
+        run: |
+          set -euo pipefail
+          live=https://schach.krisperapps.de
+          check() {
+            for attempt in 1 2 3 4 5; do
+              code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "${@:3}" "$live$1" || echo 000)"
+              [[ "$code" =~ ^($2)$ ]] && { echo "$1 -> $code"; return 0; }
+              sleep 5
+            done
+            echo "::error::$1 answers $code, expected $2"
+            exit 1
+          }
+          check / 200
+          check /manifest.webmanifest 200
+          check /vendor/stockfish-19-lite-single.wasm 200
+          # The API is up: reading it is refused, and so is an upload without an
+          # image (401 without the access code; 400 or 503 when none is set).
+          check /api/recognize 405
+          check /api/recognize '400|401|503' -X POST -H 'content-type: application/json' -d '{}'
 
   # Tags every tested commit on main with the next patch version (vX.Y.Z).
   version:
