@@ -22,7 +22,7 @@ node scripts/browser-check.mjs [url] [shot.png]   # headless Chrome smoke test, 
 
 - CI (`ci.yml`): `check` on every push/PR; on `main` "Version tag", then job
   `server` ("krisperapps.de") writes the tag into `public/js/version.js` (the repo holds
-  `dev`; shown at the bottom of the start screen), stamps `public/sw.js`, rsyncs `public/`, `functions/`,
+  `dev`; shown at the bottom of the start screen as `v1.2.3`), stamps `public/sw.js`, rsyncs `public/`, `functions/`,
   `server/` to the server (secret `DEPLOY_SSH_KEY`) and verifies the live site. The
   server restarts the service when `.version` changes. There is no manual deploy.
 - The browser check is not in CI. It needs Chrome (Worker + WASM), not a lightweight
