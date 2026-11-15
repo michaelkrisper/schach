@@ -43,6 +43,11 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
+      # The app shows its version: the tag, without the "v". Before the hashing below.
+      - name: Stamp version
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: printf "export const VERSION = '%s';\n" "${VERSION#v}" > public/js/version.js
       # The service worker's cache names get a content hash of their files.
       - run: node scripts/stamp-sw.mjs public
       - name: Upload
@@ -62,6 +67,8 @@ jobs:
           echo "$VERSION" > .version
           rsync -tz --inplace -e 'ssh -i ~/.ssh/deploy' .version deploy@krisperapps.de:./
       - name: Verify
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
           set -euo pipefail
           live=https://schach.krisperapps.de
@@ -76,6 +83,7 @@ jobs:
           }
           check / 200
           check /manifest.webmanifest 200
+          curl -fsS --max-time 20 "$live/js/version.js" | grep -F "'${VERSION#v}'"
           check /vendor/stockfish-19-lite-single.wasm 200
           # The API is up: reading it is refused, and so is an upload without an
           # image (401 without the access code; 400 or 503 when none is set).

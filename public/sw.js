@@ -16,6 +16,7 @@ const SHELL = [
   '/js/engine.js',
   '/js/photo.js',
   '/js/position.js',
+  '/js/version.js',
   '/icon.svg',
   '/manifest.webmanifest',
   ...PIECES,
