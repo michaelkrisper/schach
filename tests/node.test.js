@@ -77,8 +77,20 @@ test('an oversized body, an unknown path and a wrong method are refused', async 
   assert.equal(big.status, 413);
 
   assert.equal((await realFetch(`${base}/api/nothing`)).status, 404);
+  assert.equal((await realFetch(`${base}/js/app.js`)).status, 404);
   const get = await realFetch(`${base}/api/recognize`);
   assert.equal(get.status, 405);
   assert.equal(get.headers.get('allow'), 'POST');
   assert.equal((await post(base, '{broken')).status, 400);
+});
+
+test('the start page is answered here, since the proxy passes directories on', async () => {
+  const res = await realFetch(`${base}/`);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('content-type'), 'text/html; charset=utf-8');
+  assert.equal(res.headers.get('cache-control'), 'no-cache');
+  assert.match(await res.text(), /<title>Schachfoto<\/title>/);
+  const head = await realFetch(`${base}/`, { method: 'HEAD' });
+  assert.equal(head.status, 200);
+  assert.equal(await head.text(), '');
 });

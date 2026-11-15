@@ -19,8 +19,10 @@ cat /srv/apps/schach/.version    # which version is live
 ## Requests
 
 Caddy serves every file that exists under `public/` and passes everything else
-to the Node service. That is only `POST /api/recognize`; any other path answers
-404, any other method 405. The request body may be up to 7 MB (the function
+to the Node service. That is `POST /api/recognize` and the start page `/`
+(Caddy's `file` matcher does not match a directory, so Node answers `/` with
+`public/index.html`, `Cache-Control: no-cache`); any other path answers 404, any
+other method 405. The request body may be up to 7 MB (the function
 accepts images up to 5 MB, sent as base64 inside JSON; the app scales photos to
 1568 px first, usually well below 1 MB).
 

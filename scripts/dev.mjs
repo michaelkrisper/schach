@@ -26,8 +26,7 @@ const TYPES = {
 
 /** True when the file was sent; false when public/ has no such file. */
 function serveFile(request, response) {
-  let path = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
-  if (path.endsWith('/')) path += 'index.html';
+  const path = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
   const file = resolve(PUBLIC, `.${path}`);
   if (!file.startsWith(PUBLIC + sep)) return false;
   let body;
