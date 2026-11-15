@@ -67,6 +67,22 @@ try {
   await send('Page.navigate', { url: base });
   await wait(1500);
   await evaluate(`localStorage.clear()`);
+  // The legal links: beside the version on the start screen and in the access code dialog.
+  const save = async (suffix) => {
+    if (!shot) return;
+    const png = await send('Page.captureScreenshot', { format: 'png' });
+    writeFileSync(shot.replace(/\.png$/, `${suffix}.png`), Buffer.from(png.result.data, 'base64'));
+  };
+  const legal = (where) =>
+    evaluate(`[...document.querySelectorAll('${where} .legal a')].map((a) => a.href).join(' ')`);
+  const links =
+    'https://krisperapps.de/impressum https://krisperapps.de/datenschutz#schach https://krisperapps.de/nutzung';
+  if ((await legal('#view-start')) !== links) throw new Error('legal links missing on the start screen');
+  await save('-start');
+  await evaluate(`document.querySelector('#dlg-code').showModal()`);
+  if ((await legal('#dlg-code')) !== links) throw new Error('legal links missing in the access code dialog');
+  await save('-code');
+  await evaluate(`document.querySelector('#dlg-code').close()`);
   await evaluate(`document.querySelector('#btn-manual').click()`);
   // Move the e2 pawn to e4 by hand: erase e2, place a pawn on e4.
   await evaluate(`(() => {
